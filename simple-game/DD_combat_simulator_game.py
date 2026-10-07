@@ -1,149 +1,131 @@
+#DD_combat_simulator_game.py
+
 import random
-import numbers
-import combat_messages
+import numbers as n
+import combat_messages as m
+import shorthand as s
+from game_data import characters
 
 def main() :
 
-    potion_compounding_effect = 1
-    roll_for_twenty = 1
-    ceiling_collapsed = False
-    turkey = 5
-    turn_tracker = 0
+    import variables as v
 
 
     #sigh... dictionaries are efficient
-    characters = {
-        "player": {
-            "health" : 20,
-            "damage" : {
-                "light" : 1,
-                "big" : 2,
-                "lucky" : 10
-            }
-        },
-        "enemy" : {
-            "health" : 10,
-            "damage" : {
-                "light" : 1,
-                "big" : 2,
-                "huge" : 5
-            }
-        }
-    }
 
     #this is literally just for double knick
     names = list(characters)
 
-    combat_messages.intro(characters["player"]["health"], characters["enemy"]["health"])
+    m.intro()
 
-    while characters["player"]["health"] > 0 and characters["enemy"]["health"] > 0 :
+    while s.combat_active():
         
         #D20 simulator
-        roll_for_twenty = random.randint(1, 20)
+        roll = random.randint(1, 20)
         
         #For victory flavor 
-        turn_tracker += 1
+        v.turn_tracker += 1
 
-        print(roll_for_twenty)
-        if (roll_for_twenty == 1):
+        print(roll)
+        if s.critical_fail(roll):
 
-            print(f"Oof! Critical fail, you take {characters["enemy"]["damage"]["huge"]} damage!")
+            print(f"Oof! Critical fail, you take {s.huge_attack()} damage!")
 
             #Way too much work for a rare mechanic
-            if (characters["player"]["health"] > 0) :
+            if s.player_alive() :
                 print(f"Uh-oh, what's that strange potion the enemy is drinking?")
 
-                characters["player"]["health"] = numbers.take_damage(characters["player"]["health"], characters["enemy"]["damage"]["huge"])
+                n.get_hit(s.huge_attack())
 
                 #increases each method of damage
                 for pain in characters["enemy"]["damage"]:
-                    characters["enemy"]["damage"][pain] = numbers.engine_increase(characters["enemy"]["damage"][pain], potion_compounding_effect)
+                    characters["enemy"]["damage"][pain] += v.elixir
 
                 #potion gets stronger and heals enemy for decent amount at early levels
-                potion_compounding_effect, characters["enemy"]["health"] = numbers.strange_potion(potion_compounding_effect, characters["enemy"]["health"])
+                v.elixir = n.strange_potion(v.elixir)
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
 
-        elif roll_for_twenty > 1 and roll_for_twenty < 5 :
+        elif s.low_roll(roll) :
 
-            print(f"That smarts! You take {characters["enemy"]["damage"]["big"]} damage!")
+            print(f"That smarts! You take {s.big_attack()} damage!")
 
-            characters["player"]["health"] = numbers.take_damage(characters["player"]["health"], characters["enemy"]["damage"]["big"])
+            n.get_hit(s.big_attack())
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
 
-        elif roll_for_twenty >= 5 and roll_for_twenty < 10 :
-            print(f"Ouch! You take {characters["enemy"]["damage"]["light"]} damage")
+        elif s.mid_low_roll(roll) :
+            print(f"Ouch! You take {s.small_attack()} damage")
 
-            characters["player"]["health"] = numbers.take_damage(characters["player"]["health"], characters["enemy"]["damage"]["light"])
+            n.get_hit(s.small_attack())
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
         #Double knick is 1 when enemy damage is 1
-        elif roll_for_twenty == 10 and characters["enemy"]["damage"]["light"] == 1:
+        elif s.mid_roll(roll) and s.small_attack() == 1:
             print(f"Double knick, you both take 1 damage!")
 
             for character in characters :
-                characters[character]["health"] = numbers.take_damage(characters[character]["health"], 1)
+                characters[character]["health"] -= 1
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
 
         #Double knick remains accurate as enemy strength increases
-        elif roll_for_twenty == 10 and characters["enemy"]["damage"]["light"] != 1:
-            print(f"Double knick, you deal 1 damage and take {characters["enemy"]["damage"]["light"]} damage!")
+        elif s.mid_roll(roll) and s.small_attack() != 1:
+            print(f"Double knick, you deal 1 damage and take {s.small_attack()} damage!")
 
             for i in range(len(names)) :
                 attacker = names[i]
                 target = names[(i + 1) % len(characters)]
                 
-                characters[target]["health"] = numbers.take_damage(characters[target]["health"], characters[attacker]["damage"]["light"])
+                characters[target]["health"] -= characters[attacker]["damage"]["light"]
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
 
-        elif roll_for_twenty > 10 and roll_for_twenty < 16 :
+        elif s.mid_high_roll(roll) :
             print(f"Nice Shot! You deal 1 damage!")
 
-            characters["enemy"]["health"] = numbers.take_damage(characters["enemy"]["health"], 1)
+            n.deal_damage(s.small_strike())
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
         #Healing always seems more fun to me than increased damage
-        elif roll_for_twenty >= 16 and roll_for_twenty < 20 :
+        elif s.high_roll(roll) :
             print(f"Life Sap!! Deal 2 damage and heal for 1!")
 
-            characters["player"]["health"] = numbers.heal(characters["player"]["health"], 1)
-            characters["enemy"]["health"] = numbers.take_damage(characters["enemy"]["health"], 2)
+            n.hero_heal(s.big_strike() // 2)
+            n.deal_damage(s.big_strike())
 
-            combat_messages.still_alive(characters["player"]["health"], characters["enemy"]["health"])
+            m.still_alive()
             
 
         #Ceiling collapse one-time event, auto-win without additional enemy health
-        elif roll_for_twenty == 20 and ceiling_collapsed == False :
+        elif s.critical_success(roll) and v.ceiling_collapsed == False :
             print(f"You clip a pillar and the roof collapses on the enemy!")
 
-            ceiling_collapsed = True
-            characters["enemy"]["health"] = numbers.take_damage(characters["enemy"]["health"], 10)
+            v.ceiling_collapsed = True
+            n.deal_damage(s.lucky_strike())
 
             if characters["enemy"]["health"] < 1 :
                 print(f"...")
 
             else :
-                combat_messages.wellness_check(characters["player"]["health"], characters["enemy"]["health"])
+                m.wellness_check()
             
         #Dealing 10 damage every time seems overkill, a big heal leads to a longer game
         #If you already rolled a 20 you should be winning anyway
         else :
-            print(f"You find a whole freshly cooked turkey!! Heal for {turkey}!")
+            print(f"You find a whole freshly cooked turkey!! Heal for {v.turkey}!")
             print()
             
-            characters["player"]["health"] = numbers.heal(characters["player"]["health"], turkey)
-            turkey = numbers.engine_increase(turkey, (turkey - 4))
+            n.hero_heal(v.turkey)
+            v.turkey += (v.turkey - 4)
         
     
-    combat_messages.game_end(characters["player"]["health"], characters["enemy"]["health"], roll_for_twenty, turn_tracker)
+    m.game_end(roll, v.turn_tracker)
     
 if __name__ == "__main__":
     main()
